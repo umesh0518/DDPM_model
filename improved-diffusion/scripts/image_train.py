@@ -3,6 +3,8 @@ Train a diffusion model on images.
 """
 
 import argparse
+import torch as th
+
 
 from improved_diffusion import dist_util, logger
 from improved_diffusion.image_datasets import load_data
@@ -21,6 +23,11 @@ def main():
 
     dist_util.setup_dist()
     logger.configure()
+
+    # Add the FP16 safeguard
+    if args.use_fp16 and not th.cuda.is_available():
+        logger.log("FP16 not enabled or supported, proceeding with FP32.")
+        args.use_fp16 = False
 
     logger.log("creating model and diffusion...")
     model, diffusion = create_model_and_diffusion(
@@ -55,6 +62,7 @@ def main():
         weight_decay=args.weight_decay,
         lr_anneal_steps=args.lr_anneal_steps,
     ).run_loop()
+
 
 
 def create_argparser():

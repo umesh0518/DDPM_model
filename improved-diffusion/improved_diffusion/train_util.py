@@ -28,16 +28,17 @@ from .resample import LossAwareSampler, UniformSampler
 INITIAL_LOG_LOSS_SCALE = 20.0
 
 
-
+# distributed systems might not be available in single cpu and gpu system. this part handles that and will return 1 if it is not distributed
 def get_world_size():
     if dist.is_available() and dist.is_initialized():
-        return get_world_size()
+        return dist.get_world_size()  
     return 1
 
 def get_rank():
     if dist.is_available() and dist.is_initialized():
-        return get_rank()
+        return dist.get_rank()  
     return 0
+
 
 
 class TrainLoop:
@@ -107,7 +108,7 @@ class TrainLoop:
             ]
 
         if th.cuda.is_available():
-            self.use_ddp = True
+            self.use_ddp = th.cuda.is_available() and dist.is_available() and dist.is_initialized() #checks for cuda otherwise will be false
             self.ddp_model = DDP(
                 self.model,
                 device_ids=[dist_util.dev()],
@@ -138,7 +139,8 @@ class TrainLoop:
                     )
                 )
 
-        dist_util.sync_params(self.model.parameters())
+        if dist.is_available() and dist.is_initialized():
+            dist_util.sync_params(self.model.parameters())
 
     def _load_ema_parameters(self, rate):
         ema_params = copy.deepcopy(self.master_params)
@@ -171,6 +173,11 @@ class TrainLoop:
     def _setup_fp16(self):
         self.master_params = make_master_params(self.model_params)
         self.model.convert_to_fp16()
+        logger.log(f"Model parameter shapes: {[p.size() for p in self.model_params]}")
+        logger.log(f"Master parameter shapes: {[p.size() for p in self.master_params]}")
+
+   
+
 
     def run_loop(self):
         while (
@@ -239,9 +246,21 @@ class TrainLoop:
             else:
                 loss.backward()
 
+    # def optimize_fp16(self):
+    #     if any(not th.isfinite(p.grad).all() for p in self.model_params):
+    #         self.lg_loss_scale -= 1
+    #         logger.log(f"Found NaN, decreased lg_loss_scale to {self.lg_loss_scale}")
+    #         return
     def optimize_fp16(self):
+    # Check for gradient shape mismatch
+        if len(self.model_params) != len(self.master_params):
+            raise RuntimeError(
+                f"Mismatch in number of parameters: model_params={len(self.model_params)}, "
+                f"master_params={len(self.master_params)}"
+            )
+
         if any(not th.isfinite(p.grad).all() for p in self.model_params):
-            self.lg_loss_scale -= 1
+            self.lg_loss_scale = max(self.lg_loss_scale - 1, 1)
             logger.log(f"Found NaN, decreased lg_loss_scale to {self.lg_loss_scale}")
             return
 
@@ -254,6 +273,7 @@ class TrainLoop:
             update_ema(params, self.master_params, rate=rate)
         master_params_to_model_params(self.model_params, self.master_params)
         self.lg_loss_scale += self.fp16_scale_growth
+
 
     def optimize_normal(self):
         self._log_grad_norm()
@@ -282,30 +302,44 @@ class TrainLoop:
         if self.use_fp16:
             logger.logkv("lg_loss_scale", self.lg_loss_scale)
 
+    # def save(self):
+    #     def save_checkpoint(rate, params):
+    #         state_dict = self._master_params_to_state_dict(params)
+    #         if get_rank() == 0:
+    #             logger.log(f"saving model {rate}...")
+    #             if not rate:
+    #                 filename = f"model{(self.step+self.resume_step):06d}.pt"
+    #             else:
+    #                 filename = f"ema_{rate}_{(self.step+self.resume_step):06d}.pt"
+    #             with bf.BlobFile(bf.join(get_blob_logdir(), filename), "wb") as f:
+    #                 th.save(state_dict, f)
+
+    #     save_checkpoint(0, self.master_params)
+    #     for rate, params in zip(self.ema_rate, self.ema_params):
+    #         save_checkpoint(rate, params)
+
+    #     if dist.is_available() and dist.is_initialized():
+    #         dist.barrier()  # Only call if distributed training is initialized
     def save(self):
         def save_checkpoint(rate, params):
             state_dict = self._master_params_to_state_dict(params)
             if get_rank() == 0:
                 logger.log(f"saving model {rate}...")
-                if not rate:
-                    filename = f"model{(self.step+self.resume_step):06d}.pt"
-                else:
-                    filename = f"ema_{rate}_{(self.step+self.resume_step):06d}.pt"
-                with bf.BlobFile(bf.join(get_blob_logdir(), filename), "wb") as f:
+                filename = f"model{(self.step+self.resume_step):06d}.pt" if not rate else f"ema_{rate}_{(self.step+self.resume_step):06d}.pt"
+                save_path = bf.join(get_blob_logdir(), filename)
+                if not bf.isdir(bf.dirname(save_path)):
+                    bf.makedirs(bf.dirname(save_path))
+                with bf.BlobFile(save_path, "wb") as f:
                     th.save(state_dict, f)
 
         save_checkpoint(0, self.master_params)
         for rate, params in zip(self.ema_rate, self.ema_params):
             save_checkpoint(rate, params)
 
-        if get_rank() == 0:
-            with bf.BlobFile(
-                bf.join(get_blob_logdir(), f"opt{(self.step+self.resume_step):06d}.pt"),
-                "wb",
-            ) as f:
-                th.save(self.opt.state_dict(), f)
+        if dist.is_available() and dist.is_initialized():
+            dist.barrier()
 
-        dist.barrier()
+
 
     def _master_params_to_state_dict(self, master_params):
         if self.use_fp16:
@@ -318,12 +352,31 @@ class TrainLoop:
             state_dict[name] = master_params[i]
         return state_dict
 
+    # def _state_dict_to_master_params(self, state_dict):
+    #     params = [state_dict[name] for name, _ in self.model.named_parameters()]
+    #     if self.use_fp16:
+    #         return make_master_params(params)
+    #     else:
+    #         return params
     def _state_dict_to_master_params(self, state_dict):
+        model_keys = set(self.model.state_dict().keys())
+        state_dict_keys = set(state_dict.keys())
+        
+        # Check for parameter mismatches
+        if model_keys != state_dict_keys:
+            logger.warn(
+                "Mismatch between model parameters and state_dict. "
+                f"Missing in state_dict: {model_keys - state_dict_keys}. "
+                f"Extra in state_dict: {state_dict_keys - model_keys}. Proceeding cautiously."
+            )
+        
+        # Proceed with mapping parameters
         params = [state_dict[name] for name, _ in self.model.named_parameters()]
         if self.use_fp16:
             return make_master_params(params)
         else:
             return params
+
 
 
 def parse_resume_step_from_filename(filename):
