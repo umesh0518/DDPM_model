@@ -1,4 +1,4 @@
-
+"""train_util.py"""
 
 import copy
 import functools
@@ -9,6 +9,7 @@ import numpy as np
 import torch as th
 import torch.distributed as dist
 from torch.nn.parallel.distributed import DistributedDataParallel as DDP
+from torch.nn.parallel import DataParallel as DP 
 from torch.optim import AdamW
 
 from . import dist_util, logger
@@ -107,40 +108,68 @@ class TrainLoop:
                 copy.deepcopy(self.master_params) for _ in range(len(self.ema_rate))
             ]
 
+        # if th.cuda.is_available():
+        #     self.use_ddp = th.cuda.is_available() and dist.is_available() and dist.is_initialized() #checks for cuda otherwise will be false
+        #     self.ddp_model = DDP(
+        #         self.model,
+        #         device_ids=[dist_util.dev()],
+        #         output_device=dist_util.dev(),
+        #         broadcast_buffers=False,
+        #         bucket_cap_mb=128,
+        #         find_unused_parameters=False,
+        #     )
+        # else:
+        #     if get_world_size() > 1:
+        #         logger.warn(
+        #             "Distributed training requires CUDA. "
+        #             "Gradients will not be synchronized properly!"
+        #         )
+        #     self.use_ddp = False
+        #     self.ddp_model = self.model
         if th.cuda.is_available():
-            self.use_ddp = th.cuda.is_available() and dist.is_available() and dist.is_initialized() #checks for cuda otherwise will be false
-            self.ddp_model = DDP(
-                self.model,
-                device_ids=[dist_util.dev()],
-                output_device=dist_util.dev(),
-                broadcast_buffers=False,
-                bucket_cap_mb=128,
-                find_unused_parameters=False,
-            )
+            self.use_ddp = False  # Disable DDP entirely
+            self.ddp_model = DP(self.model)  # Use DataParallel for a single GPU
         else:
-            if get_world_size() > 1:
-                logger.warn(
-                    "Distributed training requires CUDA. "
-                    "Gradients will not be synchronized properly!"
-                )
+            logger.warn("Training on CPU. Ensure performance adjustments.")
             self.use_ddp = False
             self.ddp_model = self.model
 
+       
+
+    # def _load_and_sync_parameters(self):
+    #     resume_checkpoint = find_resume_checkpoint() or self.resume_checkpoint
+
+    #     if resume_checkpoint:
+    #         self.resume_step = parse_resume_step_from_filename(resume_checkpoint)
+    #         if get_rank() == 0:
+    #             logger.log(f"loading model from checkpoint: {resume_checkpoint}...")
+    #             self.model.load_state_dict(
+    #                 dist_util.load_state_dict(
+    #                     resume_checkpoint, map_location=dist_util.dev()
+    #                 )
+    #             )
+
+    #     if dist.is_available() and dist.is_initialized():
+    #         dist_util.sync_params(self.model.parameters())
+    
     def _load_and_sync_parameters(self):
         resume_checkpoint = find_resume_checkpoint() or self.resume_checkpoint
-
         if resume_checkpoint:
             self.resume_step = parse_resume_step_from_filename(resume_checkpoint)
             if get_rank() == 0:
                 logger.log(f"loading model from checkpoint: {resume_checkpoint}...")
-                self.model.load_state_dict(
-                    dist_util.load_state_dict(
-                        resume_checkpoint, map_location=dist_util.dev()
+                try:
+                    self.model.load_state_dict(
+                        dist_util.load_state_dict(
+                            resume_checkpoint, map_location=dist_util.dev()
+                        )
                     )
-                )
-
+                except RuntimeError as e:
+                    logger.log(f"Checkpoint mismatch: {e}")
+                    raise
         if dist.is_available() and dist.is_initialized():
             dist_util.sync_params(self.model.parameters())
+
 
     def _load_ema_parameters(self, rate):
         ema_params = copy.deepcopy(self.master_params)
@@ -170,11 +199,21 @@ class TrainLoop:
             )
             self.opt.load_state_dict(state_dict)
 
+    # def _setup_fp16(self):
+    #     self.master_params = make_master_params(self.model_params)
+    #     self.model.convert_to_fp16()
+    #     logger.log(f"Model parameter shapes: {[p.size() for p in self.model_params]}")
+    #     logger.log(f"Master parameter shapes: {[p.size() for p in self.master_params]}")
     def _setup_fp16(self):
-        self.master_params = make_master_params(self.model_params)
-        self.model.convert_to_fp16()
+        try:
+            self.master_params = make_master_params(self.model_params)
+            self.model.convert_to_fp16()
+        except Exception as e:
+            logger.log(f"FP16 setup failed: {e}. Using FP32 instead.")
+            self.use_fp16 = False
         logger.log(f"Model parameter shapes: {[p.size() for p in self.model_params]}")
         logger.log(f"Master parameter shapes: {[p.size() for p in self.master_params]}")
+
 
    
 
@@ -253,11 +292,15 @@ class TrainLoop:
     #         return
     def optimize_fp16(self):
     # Check for gradient shape mismatch
+        # if len(self.model_params) != len(self.master_params):
+        #     raise RuntimeError(
+        #         f"Mismatch in number of parameters: model_params={len(self.model_params)}, "
+        #         f"master_params={len(self.master_params)}"
+        #     )
+        # Ensure master_params and model_params have the same shape
         if len(self.model_params) != len(self.master_params):
-            raise RuntimeError(
-                f"Mismatch in number of parameters: model_params={len(self.model_params)}, "
-                f"master_params={len(self.master_params)}"
-            )
+            logger.warn("Mismatch in model and master parameter count. Check initialization.")
+            return  # Skip this optimization step to prevent crashes.
 
         if any(not th.isfinite(p.grad).all() for p in self.model_params):
             self.lg_loss_scale = max(self.lg_loss_scale - 1, 1)

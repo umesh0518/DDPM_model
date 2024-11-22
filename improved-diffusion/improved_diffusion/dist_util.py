@@ -1,4 +1,5 @@
 """
+dist_util.py
 Helpers for distributed training.
 """
 
@@ -20,26 +21,20 @@ SETUP_RETRY_COUNT = 3
 
 def setup_dist():
     """
-    Setup a distributed process group.
+    Setup a distributed process group. Skip for single-GPU or CPU setups.
     """
-    if dist.is_initialized():
+    # No-op if we only have one device
+    if th.cuda.device_count() <= 1:
         return
 
-    # Only initialize the process group if there are multiple GPUs
-    if th.cuda.device_count() > 1:
-        backend = "gloo" if not th.cuda.is_available() else "nccl"
+    # If multiple GPUs are detected, initialize process group
+    backend = "gloo" if not th.cuda.is_available() else "nccl"
+    os.environ["MASTER_ADDR"] = "localhost"
+    os.environ["MASTER_PORT"] = str(_find_free_port())
+    os.environ["RANK"] = "0"
+    os.environ["WORLD_SIZE"] = "1"
+    dist.init_process_group(backend=backend, init_method="env://")
 
-        if backend == "gloo":
-            hostname = "localhost"
-        else:
-            hostname = socket.gethostbyname(socket.getfqdn())
-        os.environ["MASTER_ADDR"] = hostname
-        os.environ["RANK"] = "0"
-        os.environ["WORLD_SIZE"] = "1"
-
-        port = _find_free_port()
-        os.environ["MASTER_PORT"] = str(port)
-        dist.init_process_group(backend=backend, init_method="env://")
 
 
 

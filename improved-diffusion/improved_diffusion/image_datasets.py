@@ -1,3 +1,5 @@
+"""image_datasets.py"""
+
 from PIL import Image
 import blobfile as bf
 # from mpi4py import MPI

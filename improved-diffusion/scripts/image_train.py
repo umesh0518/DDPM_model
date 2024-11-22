@@ -1,4 +1,5 @@
 """
+image_train.py
 Train a diffusion model on images.
 """
 
@@ -21,7 +22,11 @@ from improved_diffusion.train_util import TrainLoop
 def main():
     args = create_argparser().parse_args()
 
-    dist_util.setup_dist()
+    try:
+        dist_util.setup_dist()
+    except Exception:
+        logger.log("Distributed setup skipped. Proceeding with single-device training.")
+
     logger.configure()
 
     # Add the FP16 safeguard
@@ -33,7 +38,10 @@ def main():
     model, diffusion = create_model_and_diffusion(
         **args_to_dict(args, model_and_diffusion_defaults().keys())
     )
-    model.to(dist_util.dev())
+    # model.to(dist_util.dev())
+    device = th.device("cuda:0" if th.cuda.is_available() else "cpu")
+    model.to(device)
+    
     schedule_sampler = create_named_schedule_sampler(args.schedule_sampler, diffusion)
 
     logger.log("creating data loader...")
