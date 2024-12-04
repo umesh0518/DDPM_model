@@ -35,8 +35,8 @@ def load_images_from_folder(folder_path):
     return image_paths
 
 # Paths to image folders
-real_folder = "images/real"
-fake_folder = "images/fake"
+real_folder = r"C:\Users\uyadav\Downloads\ddpm\improved-diffusion\test_images"
+fake_folder = r"C:\Users\uyadav\Downloads\ddpm\utils\output_images_nov29_cosine"
 
 # Get image paths
 real_image_paths = load_images_from_folder(real_folder)

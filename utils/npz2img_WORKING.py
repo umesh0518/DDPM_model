@@ -37,6 +37,12 @@ def npz_to_png(npz_file, output_folder):
 
 
 # Example usage
-npz_file =  r"C:\Users\uyadav\Desktop\openai_samples_cosine_learnedsigma3x64x64x3.npz"  # Replace with your .npz file
-output_folder = "output_images"  # Replace with your desired output folder
+# npz_file =  r"c:\Users\uyadav\Desktop\openaimodel\openai_samples_cosine_learnedsigma1000600x64x64x3.npz"  # Replace with your .npz file
+# output_folder = "output_images_nov29_cosine"  # Replace with your desired output folder
+# npz_to_png(npz_file, output_folder)
+
+
+# Example usage
+npz_file =  r"c:\Users\uyadav\Desktop\openaimodel\openai_samples_linear1000600x64x64x3.npz"  # Replace with your .npz file
+output_folder = "output_images_nov29_linear"  # Replace with your desired output folder
 npz_to_png(npz_file, output_folder)

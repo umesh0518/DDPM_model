@@ -79,22 +79,40 @@ def calculate_diversity_score(fake_dir):
 
 
 # Directories for real and generated images
-# real_dir = r"C:\Users\Nitro\Downloads\IDDPM_model\DDPM_model\fake_images"  # real image directory
-# fake_dir = r"C:\Users\Nitro\Downloads\IDDPM_model\DDPM_model\real_images"  # generated image directory
 
-real_dir = r"C:\Users\uyadav\Downloads\ddpm\utils\output_images"  # real image directory
-fake_dir = r"C:\Users\uyadav\Downloads\ddpm\utils\realimages"
+real_dir = r"C:\Users\uyadav\Downloads\ddpm\improved-diffusion\test_images"  # real image directory
+fake_dir = r"C:\Users\uyadav\Downloads\ddpm\utils\output_images_nov29_cosine"  # generated image directory
+
 
 # Temporary directories for resized images
-resized_real_dir = "resized_real_images"
-resized_fake_dir = "resized_fake_images"
+resized_real_dir = "resized_real_images_test"
+resized_fake_dir_cosine = "resized_fake_images_cosine"
 
 # Resize images for FID calculation
 resize_images(real_dir, resized_real_dir)
-resize_images(fake_dir, resized_fake_dir)
+resize_images(fake_dir, resized_fake_dir_cosine)
 
-# Calculate FID Score
-fid_score_value = calculate_fid(resized_real_dir, resized_fake_dir)
+print("Cosine:")
+calculate_fid(resized_real_dir, resized_fake_dir_cosine)
+# Calculate Diversity Score for cosine
+diversity_score_value = calculate_diversity_score(resized_fake_dir_cosine)
 
-# Calculate Diversity Score
-diversity_score_value = calculate_diversity_score(resized_fake_dir)
+
+# Directories for real and generated images
+# real_dir = r"C:\Users\uyadav\Downloads\ddpm\improved-diffusion\test_images"  # real image directory
+fake_dir = r"C:\Users\uyadav\Downloads\ddpm\utils\output_images_nov29_linear"  # generated image directory
+
+# Temporary directories for resized images
+# resized_real_dir = "resized_real_images11"
+resized_fake_dir_linear = "resized_fake_images_linear"
+
+
+resize_images(real_dir, resized_real_dir)
+resize_images(fake_dir, resized_fake_dir_linear)
+print("Linear:")
+calculate_fid(resized_real_dir, resized_fake_dir_linear)
+# Calculate Diversity Score for linear
+diversity_score_value = calculate_diversity_score(resized_fake_dir_linear)
+
+
+

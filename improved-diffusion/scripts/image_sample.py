@@ -1,6 +1,7 @@
 """
 Generate a large batch of image samples from a model and save them as a large
 numpy array. This can be used to produce samples for FID evaluation.
+
 """
 
 import argparse
@@ -76,7 +77,7 @@ def main():
     # Save generated samples
     shape_str = "x".join([str(x) for x in arr.shape])
     desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
-    out_path = os.path.join(desktop_path, f"openai_samples_mero_ddimbala{shape_str}.npz")
+    out_path = os.path.join(desktop_path, f"openai_samples_cosine_learnedsigma1000{shape_str}.npz")
 
     logger.log(f"saving to {out_path}")
     if args.class_cond:
@@ -90,8 +91,8 @@ def main():
 def create_argparser():
     defaults = dict(
         clip_denoised=True,
-        num_samples=3,
-        batch_size=3,
+        num_samples=600,
+        batch_size=16,
         use_ddim=False,
         model_path="",
     )
