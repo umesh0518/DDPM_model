@@ -30,51 +30,51 @@ def resize_images(input_dir, output_dir, target_size=(299, 299)):
             img.save(os.path.join(output_dir, filename))
 
 # Function to calculate Diversity Score (DS) using LPIPS
-def calculate_diversity_score(fake_dir):
-    model = lpips.LPIPS(net='alex')  # Use AlexNet backbone for perceptual similarity
-    print("Calculating Diversity Score...")
+# def calculate_diversity_score(fake_dir):
+#     model = lpips.LPIPS(net='alex')  # Use AlexNet backbone for perceptual similarity
+#     print("Calculating Diversity Score...")
 
-    # Load all images in the generated (fake) directory
-    image_paths = [os.path.join(fake_dir, f) for f in os.listdir(fake_dir)
-                   if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
-    images = [Image.open(path).convert('RGB') for path in image_paths]
+#     # Load all images in the generated (fake) directory
+#     image_paths = [os.path.join(fake_dir, f) for f in os.listdir(fake_dir)
+#                    if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+#     images = [Image.open(path).convert('RGB') for path in image_paths]
 
-    # Debugging: Check number of images loaded
-    print(f"Number of images loaded for diversity calculation: {len(images)}")
+#     # Debugging: Check number of images loaded
+#     print(f"Number of images loaded for diversity calculation: {len(images)}")
 
-    # Check if there are enough images to calculate diversity
-    if len(images) < 2:
-        print("Not enough images to calculate Diversity Score. At least 2 images are required.")
-        return None
+#     # Check if there are enough images to calculate diversity
+#     if len(images) < 2:
+#         print("Not enough images to calculate Diversity Score. At least 2 images are required.")
+#         return None
 
-    # Resize all images to the same size (optional, avoid interpolation if identical)
-    images = [img.resize((256, 256), Image.NEAREST) for img in images]
+#     # Resize all images to the same size (optional, avoid interpolation if identical)
+#     images = [img.resize((256, 256), Image.NEAREST) for img in images]
 
-    # Convert images to tensors and normalize
-    tensors = [torch.tensor(np.array(img).transpose(2, 0, 1)).float() / 255.0 for img in images]
-    tensors = [t.unsqueeze(0) for t in tensors]  # Add batch dimension
+#     # Convert images to tensors and normalize
+#     tensors = [torch.tensor(np.array(img).transpose(2, 0, 1)).float() / 255.0 for img in images]
+#     tensors = [t.unsqueeze(0) for t in tensors]  # Add batch dimension
 
-    # Calculate pairwise LPIPS distances
-    distances = []
-    for i in range(len(tensors)):
-        for j in range(i + 1, len(tensors)):
-            # Debugging: Check if tensors are identical
-            if torch.equal(tensors[i], tensors[j]):
-                print(f"Images {i} and {j} are identical.")
-                distances.append(0.0)  # Append 0 for identical images
-            else:
-                dist = model(tensors[i], tensors[j]).item()
-                distances.append(dist)
+#     # Calculate pairwise LPIPS distances
+#     distances = []
+#     for i in range(len(tensors)):
+#         for j in range(i + 1, len(tensors)):
+#             # Debugging: Check if tensors are identical
+#             if torch.equal(tensors[i], tensors[j]):
+#                 print(f"Images {i} and {j} are identical.")
+#                 distances.append(0.0)  # Append 0 for identical images
+#             else:
+#                 dist = model(tensors[i], tensors[j]).item()
+#                 distances.append(dist)
 
-    # Check if distances were calculated
-    if len(distances) == 0:
-        print("No distances could be calculated. Check the input images.")
-        return None
+#     # Check if distances were calculated
+#     if len(distances) == 0:
+#         print("No distances could be calculated. Check the input images.")
+#         return None
 
-    # Compute diversity score as the average perceptual distance
-    diversity_score = sum(distances) / len(distances)
-    print(f"Diversity Score (DS): {diversity_score}")
-    return diversity_score
+#     # Compute diversity score as the average perceptual distance
+#     diversity_score = sum(distances) / len(distances)
+#     print(f"Diversity Score (DS): {diversity_score}")
+#     return diversity_score
 
 
 
@@ -95,7 +95,7 @@ resize_images(fake_dir, resized_fake_dir_cosine)
 print("Cosine:")
 calculate_fid(resized_real_dir, resized_fake_dir_cosine)
 # Calculate Diversity Score for cosine
-diversity_score_value = calculate_diversity_score(resized_fake_dir_cosine)
+# diversity_score_value = calculate_diversity_score(resized_fake_dir_cosine)
 
 
 # Directories for real and generated images
@@ -112,7 +112,7 @@ resize_images(fake_dir, resized_fake_dir_linear)
 print("Linear:")
 calculate_fid(resized_real_dir, resized_fake_dir_linear)
 # Calculate Diversity Score for linear
-diversity_score_value = calculate_diversity_score(resized_fake_dir_linear)
+#diversity_score_value = calculate_diversity_score(resized_fake_dir_linear)
 
 
 
