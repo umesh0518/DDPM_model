@@ -77,7 +77,7 @@ def main():
     # Save generated samples
     shape_str = "x".join([str(x) for x in arr.shape])
     desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
-    out_path = os.path.join(desktop_path, f"openai_samples_cosine_learnedsigma1000{shape_str}.npz")
+    out_path = os.path.join(desktop_path, f"openai_samples_cosine_only_8th__600{shape_str}.npz")
 
     logger.log(f"saving to {out_path}")
     if args.class_cond:
@@ -87,7 +87,8 @@ def main():
 
     logger.log("sampling complete")
 
-
+# num_samples=600,
+#         batch_size=16,
 def create_argparser():
     defaults = dict(
         clip_denoised=True,

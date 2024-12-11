@@ -2,8 +2,6 @@ import os
 from PIL import Image
 import torch
 from pytorch_fid import fid_score
-import lpips
-import numpy as np
 
 # Function to calculate FID Score
 def calculate_fid(real_dir, fake_dir):
@@ -17,7 +15,7 @@ def calculate_fid(real_dir, fake_dir):
     print(f"FID Score: {fid_value}")
     return fid_value
 
-# Function to resize images to 299x299 (required for FID and diversity calculations)
+# Function to resize images to 299x299 (required for FID calculations)
 def resize_images(input_dir, output_dir, target_size=(299, 299)):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -29,90 +27,47 @@ def resize_images(input_dir, output_dir, target_size=(299, 299)):
             img = img.resize(target_size, Image.LANCZOS)
             img.save(os.path.join(output_dir, filename))
 
-# Function to calculate Diversity Score (DS) using LPIPS
-# def calculate_diversity_score(fake_dir):
-#     model = lpips.LPIPS(net='alex')  # Use AlexNet backbone for perceptual similarity
-#     print("Calculating Diversity Score...")
-
-#     # Load all images in the generated (fake) directory
-#     image_paths = [os.path.join(fake_dir, f) for f in os.listdir(fake_dir)
-#                    if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
-#     images = [Image.open(path).convert('RGB') for path in image_paths]
-
-#     # Debugging: Check number of images loaded
-#     print(f"Number of images loaded for diversity calculation: {len(images)}")
-
-#     # Check if there are enough images to calculate diversity
-#     if len(images) < 2:
-#         print("Not enough images to calculate Diversity Score. At least 2 images are required.")
-#         return None
-
-#     # Resize all images to the same size (optional, avoid interpolation if identical)
-#     images = [img.resize((256, 256), Image.NEAREST) for img in images]
-
-#     # Convert images to tensors and normalize
-#     tensors = [torch.tensor(np.array(img).transpose(2, 0, 1)).float() / 255.0 for img in images]
-#     tensors = [t.unsqueeze(0) for t in tensors]  # Add batch dimension
-
-#     # Calculate pairwise LPIPS distances
-#     distances = []
-#     for i in range(len(tensors)):
-#         for j in range(i + 1, len(tensors)):
-#             # Debugging: Check if tensors are identical
-#             if torch.equal(tensors[i], tensors[j]):
-#                 print(f"Images {i} and {j} are identical.")
-#                 distances.append(0.0)  # Append 0 for identical images
-#             else:
-#                 dist = model(tensors[i], tensors[j]).item()
-#                 distances.append(dist)
-
-#     # Check if distances were calculated
-#     if len(distances) == 0:
-#         print("No distances could be calculated. Check the input images.")
-#         return None
-
-#     # Compute diversity score as the average perceptual distance
-#     diversity_score = sum(distances) / len(distances)
-#     print(f"Diversity Score (DS): {diversity_score}")
-#     return diversity_score
-
-
-
 # Directories for real and generated images
+real_dir = r"C:\Users\uyadav\Downloads\ddpm\improved-diffusion\test_images"
 
-real_dir = r"C:\Users\uyadav\Downloads\ddpm\improved-diffusion\test_images"  # real image directory
-fake_dir = r"C:\Users\uyadav\Downloads\ddpm\utils\output_images_nov29_cosine"  # generated image directory
-
-
-# Temporary directories for resized images
+# Temporary directory for resized real images
 resized_real_dir = "resized_real_images_test"
-resized_fake_dir_cosine = "resized_fake_images_cosine"
 
-# Resize images for FID calculation
-resize_images(real_dir, resized_real_dir)
-resize_images(fake_dir, resized_fake_dir_cosine)
+# Check if resized real images already exist
+if not os.path.exists(resized_real_dir) or not os.listdir(resized_real_dir):
+    print("Resizing real images...")
+    resize_images(real_dir, resized_real_dir)
+else:
+    print("Resized real images already exist, skipping...")
+    
+# Process for cosine only generated images
+fake_dir_cosine_only = r"C:\Users\uyadav\Downloads\ddpm\utils\output_images_dec7_cosineonly_learned_signma_false"
+resized_fake_dir_cosine_only = "resized_fake_images_cosine_only"
 
-print("Cosine:")
-calculate_fid(resized_real_dir, resized_fake_dir_cosine)
-# Calculate Diversity Score for cosine
-# diversity_score_value = calculate_diversity_score(resized_fake_dir_cosine)
+print("Processing cosine only images...")
+resize_images(fake_dir_cosine_only, resized_fake_dir_cosine_only)
+calculate_fid(resized_real_dir, resized_fake_dir_cosine_only)
 
+# Process for cosine with learned sigma generated images
+fake_dir_cosine_learnedSignma = r"C:\Users\uyadav\Downloads\ddpm\utils\output_images_nov29_cosine_learnedsigma"
+resized_fake_dir_cosine_learnedSignma = "resized_fake_images_cosine_leanedsigna_true"
 
-# Directories for real and generated images
-# real_dir = r"C:\Users\uyadav\Downloads\ddpm\improved-diffusion\test_images"  # real image directory
-fake_dir = r"C:\Users\uyadav\Downloads\ddpm\utils\output_images_nov29_linear"  # generated image directory
+print("Processing cosine and learned signma True images...")
+resize_images(fake_dir_cosine_learnedSignma, resized_fake_dir_cosine_learnedSignma)
+calculate_fid(resized_real_dir, resized_fake_dir_cosine_learnedSignma)
 
-# Temporary directories for resized images
-# resized_real_dir = "resized_real_images11"
-resized_fake_dir_linear = "resized_fake_images_linear"
+# Process for linear only generated images
+fake_dir_linear_only = r"C:\Users\uyadav\Downloads\ddpm\utils\output_images_nov29_linear"
+resized_fake_dir_linear_only = "resized_fake_images_linear_only"
 
+print("Processing linear only images...")
+resize_images(fake_dir_linear_only, resized_fake_dir_linear_only)
+calculate_fid(resized_real_dir, resized_fake_dir_linear_only)
 
-resize_images(real_dir, resized_real_dir)
-resize_images(fake_dir, resized_fake_dir_linear)
-print("Linear:")
-calculate_fid(resized_real_dir, resized_fake_dir_linear)
-# Calculate Diversity Score for linear
-#diversity_score_value = calculate_diversity_score(resized_fake_dir_linear)
+# Process for linear and learned signma generated images
+# fake_dir_linear_only = r"C:\Users\uyadav\Downloads\ddpm\utils\output_images_nov29_linear_andLeanered signma"
+# resized_fake_dir_linear_only = "resized_fake_images_linear_only"
 
-
-
+# print("Processing linear and learned signma images...")
+# resize_images(fake_dir_linear_only, resized_fake_dir_linear_only)
+# calculate_fid(resized_real_dir, resized_fake_dir_linear_only)

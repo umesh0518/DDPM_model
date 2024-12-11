@@ -1,12 +1,23 @@
 import os
-import random
 from PIL import Image
 import torch
 import lpips
 import numpy as np
 
+# Function to resize images
+def resize_images(input_dir, output_dir, target_size=(256, 256)):
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    for filename in os.listdir(input_dir):
+        if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+            img_path = os.path.join(input_dir, filename)
+            img = Image.open(img_path).convert('RGB')
+            img = img.resize(target_size, Image.NEAREST)
+            img.save(os.path.join(output_dir, filename))
+
 # Function to calculate Diversity Score (DS) using LPIPS
-def calculate_diversity_score(fake_dir, num_samples=50):
+def calculate_diversity_score(fake_dir):
     model = lpips.LPIPS(net='alex')  # Use AlexNet backbone for perceptual similarity
     print("Calculating Diversity Score...")
 
@@ -15,18 +26,13 @@ def calculate_diversity_score(fake_dir, num_samples=50):
                    if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
     print(f"Total images available: {len(image_paths)}")
 
-    # Check if there are enough images to sample
+    # Check if there are enough images to process
     if len(image_paths) < 2:
         print("Not enough images to calculate Diversity Score. At least 2 images are required.")
         return None
 
-    # Randomly sample 50 images (or fewer if less than 50 images are available)
-    sampled_paths = random.sample(image_paths, min(num_samples, len(image_paths)))
-    print(f"Number of images sampled: {len(sampled_paths)}")
-
-    # Load and preprocess sampled images
-    images = [Image.open(path).convert('RGB') for path in sampled_paths]
-    images = [img.resize((256, 256), Image.NEAREST) for img in images]  # Resize to 256x256
+    # Load and preprocess all images
+    images = [Image.open(path).convert('RGB') for path in image_paths]
     tensors = [torch.tensor(np.array(img).transpose(2, 0, 1)).float() / 255.0 for img in images]
     tensors = [t.unsqueeze(0) for t in tensors]  # Add batch dimension
 
@@ -49,14 +55,19 @@ def calculate_diversity_score(fake_dir, num_samples=50):
 
 
 # Directories for fake images
-resized_fake_dir_cosine = "resized_fake_images_cosine"
+resized_fake_dir_cosine_only = r"output_images_dec7_cosineonly_learned_signma_false"
+resized_fake_dir_cosine_learned_sigma = r"output_images_nov29_cosine_learnedsigma"
+resized_fake_dir_linear_only = r"output_images_nov29_linear"
 
-print("Cosine:")
-# Calculate Diversity Score for cosine with 50 random samples
-diversity_score_value = calculate_diversity_score(resized_fake_dir_cosine, num_samples=50)
+# Calculate Diversity Scores for all images
+print("Cosine only(All Images):")
+calculate_diversity_score(resized_fake_dir_cosine_only)
 
-resized_fake_dir_linear = "resized_fake_images_linear"
+print("Cosine and learn sigma(All Images):")
+calculate_diversity_score(resized_fake_dir_cosine_learned_sigma)
 
-# Uncomment below to calculate for linear images
-# print("Linear:")
-# diversity_score_value = calculate_diversity_score(resized_fake_dir_linear, num_samples=50)
+print("Linear only (All Images):")
+calculate_diversity_score(resized_fake_dir_linear_only)
+
+# print("Linear (All Images):")
+# calculate_diversity_score(resized_fake_dir_linear_only)
