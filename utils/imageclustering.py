@@ -6,8 +6,8 @@ from PIL import Image
 import cv2
 
 # Set seed for reproducibility
-random.seed(43)
-np.random.seed(43)
+random.seed(42)
+np.random.seed(42)
 
 # Function to load images in a fixed order or match similarity
 from skimage.metrics import structural_similarity as ssim
@@ -21,8 +21,9 @@ def load_random_images(folder, num_samples=25):
 
 # Function to find similar images based on SSIM
 def find_similar_images(base_folder, comparison_folders, num_samples=5):
-    base_images = sorted(os.listdir(base_folder))[:num_samples]
-    base_image_paths = [os.path.join(base_folder, img) for img in base_images]
+    image_files = sorted(os.listdir(base_folder))
+    sampled_files = random.sample(image_files, min(len(image_files), num_samples))
+    base_image_paths = [os.path.join(base_folder, img) for img in sampled_files]
 
     similar_images = []
     for folder in comparison_folders:
@@ -106,4 +107,3 @@ model_labels = ['Linear Noise Scheduler', 'Cosine Noise Scheduler', 'Cosine with
 # create_image_grid(load_random_images(folders[0], 25), title="Model 1 Samples")
 # compare_image_distributions(folders)
 side_by_side_comparison_with_matches(folders[0], folders[1:], num_samples=5, model_labels=model_labels)
-
