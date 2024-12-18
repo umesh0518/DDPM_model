@@ -4,7 +4,9 @@ Train a diffusion model on images.
 """
 
 import argparse
+import random
 import torch as th
+import numpy as np
 
 
 from improved_diffusion import dist_util, logger
@@ -18,9 +20,20 @@ from improved_diffusion.script_util import (
 )
 from improved_diffusion.train_util import TrainLoop
 
+def set_random_seeds(seed=42):
+    random.seed(seed)
+    np.random.seed(seed)
+    th.manual_seed(seed)
+    th.cuda.manual_seed_all(seed)
+    th.backends.cudnn.deterministic = True
+    th.backends.cudnn.benchmark = False
+
 
 def main():
     args = create_argparser().parse_args()
+    
+    # Set random seeds for reproducibility
+    set_random_seeds(42)
 
     try:
         dist_util.setup_dist()

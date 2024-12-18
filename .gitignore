@@ -1,4 +1,8 @@
 64size/
 improved-diffusion/test_images/
 improved-diffusion/test_images/
-
+improved-diffusion/test_images_bcn/
+improved-diffusion/train_images_bcn/
+melanoma_resize_bcndataset/
+utils/data/
+utils/melanoma_classification/

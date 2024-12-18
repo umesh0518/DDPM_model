@@ -3,9 +3,9 @@ import shutil
 import random
 
 # Paths to your dataset directory and desired output directories
-dataset_dir = "64size"
-train_dir = "train_images"
-test_dir = "test_images"
+dataset_dir = "melanoma_resize_bcndataset"
+train_dir = "train_images_bcn"
+test_dir = "test_images_bcn"
 
 # Create the train and test directories if they don’t exist
 os.makedirs(train_dir, exist_ok=True)

@@ -1,7 +1,6 @@
 """
 Generate a large batch of image samples from a model and save them as a large
 numpy array. This can be used to produce samples for FID evaluation.
-
 """
 
 import argparse
@@ -18,9 +17,15 @@ from improved_diffusion.script_util import (
     args_to_dict,
 )
 
-
 def main():
     args = create_argparser().parse_args()
+
+    # Set seed for reproducibility
+    SEED = 42
+    th.manual_seed(SEED)
+    np.random.seed(SEED)
+    if th.cuda.is_available():
+        th.cuda.manual_seed_all(SEED)
 
     # Initialize logger without distributed setup
     logger.configure()
@@ -77,7 +82,7 @@ def main():
     # Save generated samples
     shape_str = "x".join([str(x) for x in arr.shape])
     desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
-    out_path = os.path.join(desktop_path, f"openai_samples_cosine_only_8th__600{shape_str}.npz")
+    out_path = os.path.join(desktop_path, f"openai_samples_cosine_learnedsigma_bcndataset{shape_str}.npz")
 
     logger.log(f"saving to {out_path}")
     if args.class_cond:
@@ -87,8 +92,6 @@ def main():
 
     logger.log("sampling complete")
 
-# num_samples=600,
-#         batch_size=16,
 def create_argparser():
     defaults = dict(
         clip_denoised=True,
@@ -101,7 +104,6 @@ def create_argparser():
     parser = argparse.ArgumentParser()
     add_dict_to_argparser(parser, defaults)
     return parser
-
 
 if __name__ == "__main__":
     main()
